@@ -1,0 +1,9 @@
+ESP Siesta Clock with Matrix Display
+2026 by HexOhm
+
+File: ESP_Siesta_Clock_with_Matrix_Display.ino
+Lines: 7981
+Bytes: 177344
+SHA-256: 668ae363facd19c0a8dac44238cdccaea5a419ad1290b60b41b251194a177ec1
+
+Provided as-is.
