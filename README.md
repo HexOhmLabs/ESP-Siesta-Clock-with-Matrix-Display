@@ -2,7 +2,7 @@
 
 **A clever, super-dark clock that respects your sleep.**
 
-[ESP Siesta Clock](media/ESP_Siesta_Clock_Hero_624.jpg)
+![ESP Siesta Clock](media/ESP_Siesta_Clock_Hero_624.jpg)
 
 
 **2026 by HexOhm**
