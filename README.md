@@ -3,7 +3,7 @@
 **2026 by HexOhm**
 
 > **A clever, super-dark clock that respects your sleep.**
-
+![ESP Siesta Clock](media/ESP_Siesta_Clock_Hero_624.png)
 This package documents the verified **Animated Final** firmware.
 
 ## Final firmware
