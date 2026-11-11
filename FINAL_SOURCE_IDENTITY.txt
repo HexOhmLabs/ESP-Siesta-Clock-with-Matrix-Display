@@ -1,0 +1,11 @@
+ESP Siesta Clock with Matrix Display
+Animated Final - verified working build
+2026 by HexOhm
+
+Firmware: Siesta_WiFi_Clock_HOLIDAYS_WEEKENDS_ANIMATED_FINAL.ino
+Lines: 8,210
+Bytes: 182,412
+SHA-256: 8f3d867dc6df555c29daf55e5889b521067dd3d46866f3558864752d70b486a9
+
+This is the user-tested Animated build promoted from candidate v1 without code changes.
+Animated is located immediately after Funny in the Multi Color menu.

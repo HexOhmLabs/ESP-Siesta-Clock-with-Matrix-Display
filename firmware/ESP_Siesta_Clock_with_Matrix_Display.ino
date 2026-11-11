@@ -1,6 +1,4 @@
 /*
-  2026 by HexOhm
-
   ============================================================
   ESP8266 WIFI CLOCK
   DS3231 RTC
@@ -21,7 +19,7 @@
   WIFI / NTP:
     Connect and sync at power-up, then WiFi OFF.
     Reconnect only at the configured AUTOSYNC interval.
-    Default interval = 24 hours.
+    Default interval = 72 hours.
 
   IR:
     1 = brightness down
@@ -405,7 +403,8 @@ bool isNightDimmingMode = false;
 #define EEPROM_BRIGHTNESS       4
 #define EEPROM_TIMEZONE         5
 
-// EEPROM addresses 6..9 are reserved for compatibility with stored settings.
+// Addresses 6..9 belonged to the original single Siesta daytime period.
+// They are kept reserved so an upgrade does not reinterpret old data.
 #define EEPROM_LEGACY_SIESTA_0   6
 #define EEPROM_LEGACY_SIESTA_1   7
 #define EEPROM_LEGACY_SIESTA_2   8
@@ -450,19 +449,22 @@ bool isNightDimmingMode = false;
 #define EEPROM_SIESTA_SEASONS_MAGIC  41
 #define SIESTA_SEASONS_MAGIC_VALUE   0xA6
 
-// Display-format settings. The magic byte validates stored values.
-// Defaults: 12-hour display and Style 1.
+// Display-format settings added after the finalized seasonal-Siesta build.
+// A magic byte ensures an upgrade keeps the established behavior:
+// 12-hour display + Style 1 unless the user explicitly changes it.
 #define EEPROM_HOUR_FORMAT_24        42
 #define EEPROM_CLOCK_FONT_STYLE      43
 #define EEPROM_DISPLAY_SETTINGS_MAGIC 44
 #define DISPLAY_SETTINGS_MAGIC_VALUE  0xD4
 
-// OLED user-interface language. English is the default.
+// OLED user-interface language.  English remains the safe default
+// for upgrades from every previous firmware revision.
 #define EEPROM_UI_LANGUAGE             45
 #define EEPROM_UI_LANGUAGE_MAGIC       46
 #define UI_LANGUAGE_MAGIC_VALUE        0xE7
 
-// Country + public-holiday settings.
+// Country + public-holiday settings. Existing addresses 0..46 remain
+// untouched so upgrades preserve all established clock settings.
 #define EEPROM_COUNTRY_INDEX            47
 #define EEPROM_PUBLIC_HOLIDAYS_ENABLED  48
 #define EEPROM_PUBLIC_HOLIDAY_HOUR      49
@@ -480,14 +482,14 @@ bool isNightDimmingMode = false;
 #define EEPROM_HOLIDAY_BITMAP_START     56
 #define HOLIDAY_BITMAP_BYTES            46
 
-// Compact timezone-rule index. Address 5 is retained as a fallback source
-// when no valid compact timezone index is stored.
+// Compact timezone-rule index. The legacy byte at address 5 is preserved
+// for one-time migration from the established pre-expanded nine-zone firmware.
 #define EEPROM_TIMEZONE_EXT_LO          102
 #define EEPROM_TIMEZONE_EXT_HI          103
 #define EEPROM_TIMEZONE_EXT_MAGIC       104
 #define TIMEZONE_EXT_MAGIC_VALUE        0xDA
 
-// Holiday override rule selection.
+// Holiday override rule selection added after v7.
 // Bit 0 = nationwide public holidays
 // Bit 1 = Saturdays
 // Bit 2 = Sundays
@@ -508,7 +510,8 @@ bool isNightDimmingMode = false;
 #define COLOR_OFF      Adafruit_NeoPixel::Color(0, 0, 0)
 
 // MONO COLOR palette.
-// The first five palette indexes match the stored color-index mapping.
+// The first five indexes are intentionally identical to the previous
+// firmware so an already stored color remains unchanged after update.
 // Orange and orange-like colors are excluded because orange is reserved
 // exclusively for Siesta mode.
 
@@ -574,10 +577,11 @@ int clockColorIndex = 0;
 
 enum DayColorMode {
   DAY_COLOR_MONO = 0,
-  DAY_COLOR_SOLID,
-  DAY_COLOR_COLORFUL,
-  DAY_COLOR_FUNNY,
-  DAY_COLOR_DYNAMIC
+  DAY_COLOR_SOLID = 1,
+  DAY_COLOR_COLORFUL = 2,
+  DAY_COLOR_FUNNY = 3,
+  DAY_COLOR_DYNAMIC = 4,
+  DAY_COLOR_ANIMATED = 5
 };
 
 uint8_t dayColorMode = DAY_COLOR_MONO;
@@ -646,7 +650,7 @@ uint8_t dailyFunnyStep = 53;
 // each practical present/future civil-time rule used by populated regions:
 // fixed UTC offsets plus the distinct DST/seasonal-transition rules that
 // cannot be represented by a fixed offset alone. Europe/Athens is entry 0
-// with Greece as entry 0. Country selection
+// so the established Greece default remains unchanged. Country selection
 // never changes timezone automatically.
 //
 // The compact grouping follows the purpose of IANA tzdb zonenow.tab:
@@ -659,7 +663,8 @@ uint8_t dailyFunnyStep = 53;
 uint8_t countryIndex = 0;
 int timezoneIndex = 0;
 
-// Master HOLIDAYS switch stored at EEPROM address 48.
+// Master HOLIDAYS switch.  The existing EEPROM byte at address 48 is
+// deliberately retained for upgrade compatibility with v7.
 bool holidaysEnabled = false;
 
 // The three independent date rules used when HOLIDAYS is On.
@@ -667,7 +672,7 @@ bool holidayPublicDatesEnabled = true;
 bool holidaySaturdaysEnabled = false;
 bool holidaySundaysEnabled = false;
 
-// Default common Night Mode end override.
+// Fresh-install default requested for the common Night Mode end override.
 uint8_t holidayOverrideHour = 8;
 uint8_t holidayOverrideMinute = 0;
 
@@ -1588,17 +1593,19 @@ const uint8_t font5x7[10][5] = {
 // TIME DISPLAY FORMAT + SELECTABLE CLOCK FONTS
 // ============================================================
 //
-// Style 1 - Standard 5x7 font.
+// Style 1 - Original / established favorite 5x7 font.
 // Style 2 - Bold 5x7.
-// Style 3 - PacClock 7x7. Source rows are stored as 8-bit values;
-//           bit 0 is blank, so the visible glyph width is seven pixels.
+// Style 3 - PacClock 7x7, using the digit set previously approved
+//           for the PacClock project. The source rows are stored
+//           as 8-bit values; bit 0 is blank, so the visible glyph
+//           width is seven pixels.
 // Style 4 - Digital / squared 5x7.
-// Style 5 - Rounded 5x7.
+// Style 5 - Rounded 5x7, replacing the rejected Slim design.
 // Style 6 - Matrix Screen 5x7, a crisp terminal / LED-board style.
 //
 // The OLED deliberately names them only "Style 1" ... "Style 6".
 // These font selections affect ONLY the time digits. Other matrix
-// messages use Style 1 through drawNumber().
+// messages keep using the original Style 1 font through drawNumber().
 //
 
 #define NUM_CLOCK_FONT_STYLES 6
@@ -1620,7 +1627,7 @@ const uint8_t fontStyle2[10][7] = {
   {0b01110,0b11011,0b11011,0b01111,0b00011,0b00011,0b11110}  // 9
 };
 
-// Style 3 - PacClock digit set.
+// Style 3 - PacClock approved digit set.
 // Seven visible pixels are bits 7..1 of every stored row.
 // The zero is plain; there is no slash.
 const uint8_t fontStyle3PacClock[10][7] = {
@@ -1859,6 +1866,7 @@ uint32_t mixColorSeed(uint32_t value);
 void generateDailyColors(const DateTime &now);
 void ensureDailyColors(const DateTime &now);
 uint32_t funnyColorForPixel(int x, int y);
+uint32_t animatedColorForPixel(int x, int y);
 uint8_t dynamicBasePaletteIndex(const DateTime &now);
 uint32_t dynamicColorForDigitPixel(
   uint8_t basePaletteIndex,
@@ -1873,6 +1881,7 @@ void drawClockDigit(
   int startY,
   uint32_t color,
   bool funnyMode,
+  bool animatedMode,
   bool dynamicMode,
   uint8_t dynamicBaseIndex,
   int digitIndex
@@ -2233,8 +2242,15 @@ void loop() {
   //
   // IMPORTANT:
   //
-  // During Night Mode the purple IR-feedback override is constrained
-  // to BRIGHTNESS_MIN so user interaction cannot brighten the room.
+  // If an IR command is received during night mode, the old
+  // code deliberately changed currentBrightness to
+  // dayBrightness.
+  //
+  // That was the direct path that could make the display
+  // suddenly become bright during the night.
+  //
+  // The purple override is retained, but during night mode
+  // it is FORCED to BRIGHTNESS_MIN.
   //
   // Therefore:
   //
@@ -2300,6 +2316,34 @@ void loop() {
       millis();
 
     updateDisplay();
+  }
+
+  // ----------------------------------------------------------
+  // ANIMATED COLOR UPDATE
+  // ----------------------------------------------------------
+  //
+  // Animated mode is the Funny per-pixel look in motion.
+  // Refresh only this mode at 25 fps so color transitions remain
+  // smooth. No other clock mode or timing behavior is changed.
+  //
+
+  if (
+    !editorActive &&
+    dayColorMode == DAY_COLOR_ANIMATED
+  ) {
+
+    static unsigned long lastAnimatedUpdate = 0;
+
+    if (
+      millis() - lastAnimatedUpdate >=
+      40UL
+    ) {
+
+      lastAnimatedUpdate =
+        millis();
+
+      updateDisplay();
+    }
   }
 
   // ----------------------------------------------------------
@@ -2598,6 +2642,140 @@ uint32_t funnyColorForPixel(
   );
 }
 
+
+// ============================================================
+// ANIMATED COLOR
+// ============================================================
+//
+// Same per-pixel idea as Funny, but every lit LED continuously
+// fades toward independently generated random-looking colors.
+// Consecutive transition segments share their boundary color,
+// so the motion is smooth and has no short repeating loop.
+//
+uint32_t animatedColorForPixel(
+  int x,
+  int y
+) {
+
+  const unsigned long TRANSITION_MS =
+    1800UL;
+
+  unsigned long nowMs =
+    millis();
+
+  uint32_t segment =
+    nowMs /
+    TRANSITION_MS;
+
+  float phase =
+    (float)(
+      nowMs %
+      TRANSITION_MS
+    ) /
+    (float)TRANSITION_MS;
+
+  phase =
+    phase *
+    phase *
+    (3.0f - 2.0f * phase);
+
+  uint32_t logicalPixel =
+    (uint32_t)(
+      y * MATRIX_WIDTH +
+      x
+    );
+
+  uint32_t baseSeed =
+    logicalPixel * 0x9E3779B9UL ^
+    ESP.getChipId();
+
+  uint8_t fromIndex =
+    (uint8_t)(
+      mixColorSeed(
+        baseSeed ^
+        segment * 0x85EBCA6BUL
+      ) &
+      0xFF
+    );
+
+  uint8_t toIndex =
+    (uint8_t)(
+      mixColorSeed(
+        baseSeed ^
+        (segment + 1UL) *
+        0x85EBCA6BUL
+      ) &
+      0xFF
+    );
+
+  uint32_t fromColor =
+    palette256(
+      fromIndex
+    );
+
+  uint32_t toColor =
+    palette256(
+      toIndex
+    );
+
+  uint8_t fromR =
+    (fromColor >> 16) &
+    0xFF;
+
+  uint8_t fromG =
+    (fromColor >> 8) &
+    0xFF;
+
+  uint8_t fromB =
+    fromColor &
+    0xFF;
+
+  uint8_t toR =
+    (toColor >> 16) &
+    0xFF;
+
+  uint8_t toG =
+    (toColor >> 8) &
+    0xFF;
+
+  uint8_t toB =
+    toColor &
+    0xFF;
+
+  uint8_t r =
+    (uint8_t)(
+      fromR +
+      (
+        (float)toR -
+        (float)fromR
+      ) * phase
+    );
+
+  uint8_t g =
+    (uint8_t)(
+      fromG +
+      (
+        (float)toG -
+        (float)fromG
+      ) * phase
+    );
+
+  uint8_t b =
+    (uint8_t)(
+      fromB +
+      (
+        (float)toB -
+        (float)fromB
+      ) * phase
+    );
+
+  return Adafruit_NeoPixel::Color(
+    r,
+    g,
+    b
+  );
+}
+
 uint8_t dynamicBasePaletteIndex(
   const DateTime &now
 ) {
@@ -2786,7 +2964,7 @@ int clockFontWidth(
   uint8_t style
 ) {
 
-  // Style 3 uses seven-pixel-wide PacClock glyphs.
+  // Style 3 uses the approved PacClock seven-pixel-wide glyphs.
   if (style == 2) {
     return 7;
   }
@@ -2822,7 +3000,7 @@ bool clockFontPixel(
     return false;
   }
 
-  // Style 1 uses a column-based bitmap.
+  // Style 1 retains the exact original column-based bitmap.
   if (style == 0) {
     return (
       font5x7[number][col] &
@@ -2830,7 +3008,7 @@ bool clockFontPixel(
     );
   }
 
-  // Style 3 uses row-based PacClock glyph data.
+  // Style 3 uses the approved PacClock rows.
   // Visible columns are bits 7..1; bit 0 is intentionally blank.
   if (style == 2) {
 
@@ -2882,6 +3060,7 @@ void drawClockDigit(
   int startY,
   uint32_t color,
   bool funnyMode,
+  bool animatedMode,
   bool dynamicMode,
   uint8_t dynamicBaseIndex,
   int digitIndex
@@ -2945,6 +3124,13 @@ void drawClockDigit(
         if (funnyMode) {
           pixelColor =
             funnyColorForPixel(
+              x,
+              y
+            );
+        }
+        else if (animatedMode) {
+          pixelColor =
+            animatedColorForPixel(
               x,
               y
             );
@@ -3225,6 +3411,9 @@ void drawBreathingSpark(
   bool funnySpark =
     false;
 
+  bool animatedSpark =
+    false;
+
   if (isPurpleOverride) {
 
     baseColor =
@@ -3268,6 +3457,11 @@ void drawBreathingSpark(
 
       case DAY_COLOR_FUNNY:
         funnySpark =
+          true;
+        break;
+
+      case DAY_COLOR_ANIMATED:
+        animatedSpark =
           true;
         break;
 
@@ -3365,6 +3559,11 @@ void drawBreathingSpark(
       uint32_t pixelColor =
         funnySpark ?
           funnyColorForPixel(
+            x,
+            y
+          ) :
+        animatedSpark ?
+          animatedColorForPixel(
             x,
             y
           ) :
@@ -3477,7 +3676,7 @@ void updateDisplay() {
 
   } else {
 
-    // 12-hour mode: 1..12 with no leading zero.
+    // Established 12-hour behavior: 1..12 with no leading zero.
     displayHour =
       currentHour % 12;
 
@@ -3504,6 +3703,9 @@ void updateDisplay() {
     isSiestaNighttime(now);
 
   bool funnyMode =
+    false;
+
+  bool animatedMode =
     false;
 
   bool dynamicMode =
@@ -3582,6 +3784,16 @@ void updateDisplay() {
           funnyColorForPixel(31, 0);
         break;
 
+      case DAY_COLOR_ANIMATED:
+        animatedMode = true;
+        for (int i = 0; i < 4; i++) {
+          digitColor[i] =
+            clockColors[clockColorIndex];
+        }
+        accentColor =
+          animatedColorForPixel(31, 0);
+        break;
+
       case DAY_COLOR_DYNAMIC:
         dynamicMode = true;
         dynamicBaseIndex =
@@ -3617,7 +3829,7 @@ void updateDisplay() {
 
 
   // Style 3 (PacClock) is seven pixels wide. It therefore uses its own
-  // horizontal layout with the separator at X15/X16.
+  // horizontal layout while preserving the established separator at X15/X16.
   //
   //   Hours:   X0..6 and X7..13
   //   Blank:   X14
@@ -3625,7 +3837,7 @@ void updateDisplay() {
   //   Blank:   X17
   //   Minutes: X18..24 and X25..31
   //
-  // All other styles use the standard 5x7 digit positions.
+  // All other styles keep the original 5x7 digit positions.
   int hourTensX =
     hourTensX;
 
@@ -3674,6 +3886,7 @@ void updateDisplay() {
       DIGIT_Y,
       hourTensColor,
       drawFunnyDigits,
+      animatedMode,
       dynamicMode,
       dynamicBaseIndex,
       0
@@ -3685,6 +3898,7 @@ void updateDisplay() {
       DIGIT_Y,
       hourUnitsColor,
       drawFunnyDigits,
+      animatedMode,
       dynamicMode,
       dynamicBaseIndex,
       1
@@ -3698,6 +3912,7 @@ void updateDisplay() {
       DIGIT_Y,
       hourUnitsColor,
       drawFunnyDigits,
+      animatedMode,
       dynamicMode,
       dynamicBaseIndex,
       1
@@ -3716,6 +3931,7 @@ void updateDisplay() {
     DIGIT_Y,
     minuteTensColor,
     drawFunnyDigits,
+    animatedMode,
     dynamicMode,
     dynamicBaseIndex,
     2
@@ -3727,6 +3943,7 @@ void updateDisplay() {
     DIGIT_Y,
     minuteUnitsColor,
     drawFunnyDigits,
+    animatedMode,
     dynamicMode,
     dynamicBaseIndex,
     3
@@ -3735,6 +3952,8 @@ void updateDisplay() {
   uint32_t pmColor =
     funnyMode ?
       funnyColorForPixel(31, 0) :
+    animatedMode ?
+      animatedColorForPixel(31, 0) :
       accentColor;
 
   drawAMPMLED(
@@ -5005,7 +5224,7 @@ void showEditor() {
           idx == editorMenuIndex ? ">" : " "
         );
       } else {
-        // English menu coordinates.
+        // Preserve the established English coordinates exactly.
         u8g2.drawStr(
           2,
           y,
@@ -5218,6 +5437,7 @@ void showEditor() {
       "Solid Color",
       "Colorful",
       "Funny",
+      "Animated",
       "Dynamic"
     };
 
@@ -5226,6 +5446,7 @@ void showEditor() {
       "Συμπαγές Χρώμα",
       "Πολύχρωμο",
       "Αστείο",
+      "Animated",
       "Δυναμικό"
     };
 
@@ -6133,11 +6354,11 @@ void handleEditorCommand(uint16_t commandCode) {
 
   if (editorPage == EDITOR_MULTI_COLOR) {
     if (commandCode == IR_UP) {
-      editorSelection = (editorSelection + 4) % 5;
+      editorSelection = (editorSelection + 5) % 6;
       showEditor();
     }
     else if (commandCode == IR_DOWN) {
-      editorSelection = (editorSelection + 1) % 5;
+      editorSelection = (editorSelection + 1) % 6;
       showEditor();
     }
     else if (commandCode == IR_ENTER) {
@@ -6157,6 +6378,9 @@ void handleEditorCommand(uint16_t commandCode) {
       }
       else if (editorSelection == 3) {
         dayColorMode = DAY_COLOR_FUNNY;
+      }
+      else if (editorSelection == 4) {
+        dayColorMode = DAY_COLOR_ANIMATED;
       }
       else {
         dayColorMode = DAY_COLOR_DYNAMIC;
@@ -6528,7 +6752,7 @@ void loadDayColorMode() {
   if (
     magic == COLOR_MODE_MAGIC_VALUE &&
     mode >= DAY_COLOR_MONO &&
-    mode <= DAY_COLOR_DYNAMIC
+    mode <= DAY_COLOR_ANIMATED
   ) {
 
     dayColorMode =
@@ -6536,7 +6760,7 @@ void loadDayColorMode() {
 
   } else {
 
-    // Default to Mono Color when no valid setting is stored.
+    // First startup with this firmware keeps established Mono Color.
     dayColorMode =
       DAY_COLOR_MONO;
 
@@ -6654,7 +6878,7 @@ void loadDisplaySettings() {
 
   } else {
 
-    // Defaults when no valid display settings are stored.
+    // Safe upgrade/default behavior exactly matches the established clock.
     use24HourFormat = false;
     clockFontStyle = 0;
 
@@ -6703,7 +6927,7 @@ void loadLanguageSetting() {
     uiLanguage =
       (uint8_t)storedLanguage;
   } else {
-    // Default to English when no valid language setting is stored.
+    // Every existing English-only firmware upgrades safely to English.
     uiLanguage = UI_ENGLISH;
     saveLanguageSetting();
   }
@@ -6806,7 +7030,8 @@ void loadHolidayRuleSettings() {
 
   } else {
 
-    // Defaults: Public Holidays selected; weekends unselected.
+    // Upgrade from v7: preserve exactly the behavior that already existed.
+    // Public Holidays remains selected; weekends remain unselected.
     holidayPublicDatesEnabled = true;
     holidaySaturdaysEnabled = false;
     holidaySundaysEnabled = false;
@@ -7097,9 +7322,13 @@ void loadTimezone() {
     }
   }
 
-  // Fallback mapping used when no valid compact timezone index is stored.
-  // EEPROM address 5 contains a 0..8 timezone selector that maps to the
-  // corresponding compact civil-time rule.
+  // Compact-table migration.
+  //
+  // Address 5 is the preserved timezone byte from the established
+  // pre-expanded nine-zone firmware.  A v6 geographic-table index is not
+  // reused because its numeric meaning is different in the compact table.
+  // Instead the original nine-zone value is mapped directly to the matching
+  // compact civil-time rule.
   //
   // 0 Greece          -> UTC+02/+03 EU DST
   // 1 UK              -> UTC+00/+01 EU DST
@@ -7705,7 +7934,7 @@ bool reconnectSavedWiFi(
   unsigned long timeoutMs
 ) {
 
-  // Wake the radio before a synchronization session.
+  // Wake the radio if it was switched off after the previous sync.
   WiFi.forceSleepWake();
 
   delay(

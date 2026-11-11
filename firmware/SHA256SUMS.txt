@@ -1,0 +1,1 @@
+8f3d867dc6df555c29daf55e5889b521067dd3d46866f3558864752d70b486a9  /mnt/data/siesta_prepare/ESP_Siesta_Clock_ANIMATED_FINAL_GITHUB_READY_2026_by_HexOhm/firmware/ESP_Siesta_Clock_with_Matrix_Display.ino
